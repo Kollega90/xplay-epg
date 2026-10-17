@@ -1,0 +1,62 @@
+name: Build EPG
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'     # каждые 6 часов
+  workflow_dispatch: {}         # и вручную кнопкой Run workflow
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # Источники по очереди, пока один не скачается. Можно поменять/добавить свои (через пробел).
+      EPG_URLS: >-
+        http://only4.tv/epg/epg.xml.gz
+        http://only4.tv/epg/epg.xml
+        http://1lot.tv/epg/epg.xml
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download EPG
+        run: |
+          ok=0
+          for u in $EPG_URLS; do
+            echo "try $u"
+            if curl -fL --retry 3 --max-time 600 -o epg.src "$u" && [ -s epg.src ]; then ok=1; break; fi
+          done
+          [ "$ok" = 1 ] || { echo "no EPG source reachable"; exit 1; }
+          ls -la epg.src
+      - name: Build epg.json
+        run: |
+          mkdir -p site
+          python3 build_epg.py epg.src site/epg.json
+      - name: Sanity check
+        run: |
+          python3 - <<'PY'
+          import json
+          d = json.load(open('site/epg.json', encoding='utf-8'))
+          assert len(d['c']) > 50, 'too few channels'
+          print('ok', len(d['c']))
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
