@@ -34,17 +34,24 @@ jobs:
           done
           [ "$ok" = 1 ] || { echo "no EPG source reachable"; exit 1; }
           ls -la epg.src
-      - name: Build epg.json
+      - name: Build epg.json and channel files
         run: |
           mkdir -p site
           python3 build_epg.py epg.src site/epg.json
+          du -sh site site/ch
       - name: Sanity check
         run: |
           python3 - <<'PY'
-          import json
+          import json, os
           d = json.load(open('site/epg.json', encoding='utf-8'))
           assert len(d['c']) > 50, 'too few channels'
-          print('ok', len(d['c']))
+          files = [f for f in os.listdir('site/ch') if f.endswith('.json')]
+          assert len(files) > 50, 'too few channel files'
+          nf = sum(1 for v in d['c'].values() if v.get('f'))
+          assert nf == len(files), 'f/file mismatch: %d vs %d' % (nf, len(files))
+          total = sum(os.path.getsize(os.path.join('site/ch', f)) for f in files)
+          assert total < 600 * 1024 * 1024, 'site too big'
+          print('ok channels', len(d['c']), 'files', len(files), 'MB %.1f' % (total / 1048576.0))
           PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
