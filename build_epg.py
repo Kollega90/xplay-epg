@@ -11,15 +11,15 @@ import sys, os, gzip, json, time, calendar, re, hashlib, xml.etree.ElementTree a
 
 HOURS_AHEAD = 24        # главный epg.json: вперёд
 HOURS_BACK = 3          # главный epg.json: назад (на случай ушедших часов пояса/задержки)
-DESC_FOR = 2            # главный epg.json: описания только у стольких передач на канал
-DESC_MAX = 200
+DESC_FOR = 4            # главный epg.json: описания только у стольких передач на канал (остальное приложение дозагружает из ch/<f>.json)
+DESC_MAX = 700
 
 CH_BACK_H = 7 * 24 + 2  # файлы каналов: назад (архив у провайдера 7 суток)
 CH_AHEAD_H = 48         # файлы каналов: вперёд
-CH_DESC_MAX = 200
+CH_DESC_MAX = 700
 MAX_TOTAL = int(os.environ.get('EPG_MAX_TOTAL_MB', '300')) * 1024 * 1024   # предел суммарного размера файлов каналов
 # если файлы получаются слишком большими: (длина описания, описания только у передач, закончившихся не раньше N секунд назад; None = у всех)
-LEVELS = [(CH_DESC_MAX, None), (120, 36 * 3600), (0, 0)]
+LEVELS = [(CH_DESC_MAX, None), (400, None), (200, 36 * 3600), (0, 0)]
 
 
 def ts(s):
@@ -32,8 +32,13 @@ def ts(s):
     return t
 
 
+NN_RE = re.compile(r'(?:(?<=[.!?\u2026\u00bb"\u201d)\]:;])|^)(?:nn)+(?=[\s\u0410-\u042f\u0406\u0407\u0404\u0490A-Z0-9\u00ab"\u201c(\-\u2013\u2014]|$)')
+
+
 def clean(d):
-    return (d or '').strip().replace('\\n', ' ').replace('nn', ' ')
+    # провайдер пишет перенос строки как «nn» (после знака препинания, перед заглавной); слова с «nn» внутри (ODonnell) не трогаем
+    d = (d or '').strip().replace('\\n', ' ')
+    return NN_RE.sub(' ', d).strip()
 
 
 def fname(cid, used):
