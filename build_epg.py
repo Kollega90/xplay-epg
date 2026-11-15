@@ -12,11 +12,11 @@ import sys, os, gzip, json, time, calendar, re, hashlib, xml.etree.ElementTree a
 HOURS_AHEAD = 24        # главный epg.json: вперёд
 HOURS_BACK = 3          # главный epg.json: назад (на случай ушедших часов пояса/задержки)
 DESC_FOR = 4            # главный epg.json: описания только у стольких передач на канал (остальное приложение дозагружает из ch/<f>.json)
-DESC_MAX = 700
+DESC_MAX = 1500
 
 CH_BACK_H = 7 * 24 + 2  # файлы каналов: назад (архив у провайдера 7 суток)
 CH_AHEAD_H = 48         # файлы каналов: вперёд
-CH_DESC_MAX = 700
+CH_DESC_MAX = 1500
 MAX_TOTAL = int(os.environ.get('EPG_MAX_TOTAL_MB', '300')) * 1024 * 1024   # предел суммарного размера файлов каналов
 # если файлы получаются слишком большими: (длина описания, описания только у передач, закончившихся не раньше N секунд назад; None = у всех)
 LEVELS = [(CH_DESC_MAX, None), (400, None), (200, 36 * 3600), (0, 0)]
