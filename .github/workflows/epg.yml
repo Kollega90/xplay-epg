@@ -2,7 +2,7 @@ name: Build EPG
 
 on:
   schedule:
-    - cron: '17 */6 * * *'     # каждые 6 часов
+    - cron: '43 */4 * * *'     # каждые 4 часа (минута 43 — реже пропуски)
   workflow_dispatch: {}         # и вручную кнопкой Run workflow
 
 permissions:

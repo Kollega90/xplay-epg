@@ -11,7 +11,7 @@ import sys, os, gzip, json, time, calendar, re, hashlib, xml.etree.ElementTree a
 
 HOURS_AHEAD = 24        # главный epg.json: вперёд
 HOURS_BACK = 3          # главный epg.json: назад (на случай ушедших часов пояса/задержки)
-DESC_FOR = 4            # главный epg.json: описания только у стольких передач на канал (остальное приложение дозагружает из ch/<f>.json)
+DESC_FOR = 1            # главный epg.json: описания только у стольких передач на канал (остальное приложение дозагружает из ch/<f>.json)
 DESC_MAX = 1500
 
 CH_BACK_H = 7 * 24 + 2  # файлы каналов: назад (архив у провайдера 7 суток)
