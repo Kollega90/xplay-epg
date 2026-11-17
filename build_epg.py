@@ -11,8 +11,9 @@ import sys, os, gzip, json, time, calendar, re, hashlib, xml.etree.ElementTree a
 
 HOURS_AHEAD = 24        # главный epg.json: вперёд
 HOURS_BACK = 3          # главный epg.json: назад (на случай ушедших часов пояса/задержки)
-DESC_FOR = 1            # главный epg.json: описания только у стольких передач на канал (остальное приложение дозагружает из ch/<f>.json)
+DESC_FOR = 2            # главный epg.json: описания только у стольких передач на канал (остальное приложение дозагружает из ch/<f>.json)
 DESC_MAX = 1500
+MAIN_NEXT = 2          # главный epg.json: сколько передач после текущей
 
 CH_BACK_H = 7 * 24 + 2  # файлы каналов: назад (архив у провайдера 7 суток)
 CH_AHEAD_H = 48         # файлы каналов: вперёд
@@ -112,6 +113,10 @@ def main(src, dst):
         files[cid] = fname(cid, used)
     for cid, lst in wide.items():
         main_l = [list(p) for p in lst if p[1] > lo and p[0] < hi]
+        # главный файл должен быть лёгким (кэш в localStorage ТВ ~5 МБ): одна прошедшая + текущая + MAIN_NEXT следующих
+        cur = 0
+        while cur < len(main_l) and main_l[cur][1] <= now: cur += 1
+        main_l = main_l[max(0, cur - 1):cur + 1 + MAIN_NEXT]
         k = 0
         for p in main_l:
             if p[1] > now and k < DESC_FOR:
