@@ -34,6 +34,37 @@ jobs:
           done
           [ "$ok" = 1 ] || { echo "no EPG source reachable"; exit 1; }
           ls -la epg.src
+      - name: DIAG (временно) каналы без программы
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          import gzip, re, time, calendar
+          raw = open('epg.src', 'rb').read()
+          if raw[:2] == b'\x1f\x8b': raw = gzip.decompress(raw)
+          t = raw.decode('utf-8', 'replace')
+          def norm(s): return re.sub(r'[^a-zа-яёіїєґ0-9+]', '', s.lower())
+          want = ['1+1', 'стб', 'новийканал', 'тет']
+          chans = {}
+          for m in re.finditer(r'<channel id="([^"]*)"[^>]*>(.*?)</channel>', t, re.S):
+              chans[m.group(1)] = [norm(x) for x in re.findall(r'<display-name[^>]*>([^<]*)', m.group(2))]
+          now = time.time()
+          def ts(s):
+              m = re.match(r'(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)?\s*([+-]\d{4})?', s)
+              v = calendar.timegm((int(m[1]), int(m[2]), int(m[3]), int(m[4]), int(m[5]), int(m[6] or 0)))
+              if m[7]: v -= (1 if m[7][0] == '+' else -1) * (int(m[7][1:3]) * 3600 + int(m[7][3:5]) * 60)
+              return v
+          cnt = {}; last = {}
+          for m in re.finditer(r'<programme start="([^"]*)" stop="([^"]*)" channel="([^"]*)"', t):
+              b = ts(m[2])
+              if b > now and ts(m[1]) < now + 86400:
+                  cnt[m[3]] = cnt.get(m[3], 0) + 1
+          print('channels in source:', len(chans), 'with future programmes:', len(cnt))
+          for w in want:
+              hits = [i for i, n in chans.items() if w in n]
+              print('==', w, 'matches:', len(hits))
+              for i in hits[:12]:
+                  print('  id=%s names=%s progs_next24h=%d' % (i, chans[i][:3], cnt.get(i, 0)))
+          PY
       - name: Build epg.json and channel files
         run: |
           mkdir -p site
