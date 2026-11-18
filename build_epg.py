@@ -62,6 +62,23 @@ def dedupe(lst):
     return ded
 
 
+def drop_umbrella(lst):
+    # в источнике бывают «накрывающие» записи на сутки (одна передача поверх всей сетки): удаляем запись длиннее 5 ч,
+    # если внутри неё целиком лежат 2 и больше других передач
+    if len(lst) < 3: return lst
+    res = []
+    for p in lst:
+        if p[1] - p[0] > 5 * 3600:
+            inner = 0
+            for q in lst:
+                if q is not p and q[0] >= p[0] and q[1] <= p[1]:
+                    inner += 1
+                    if inner >= 2: break
+            if inner >= 2: continue
+        res.append(p)
+    return res
+
+
 def write_channels(chdir, wide, files, now, desc_max, desc_from):
     os.makedirs(chdir, exist_ok=True)
     for old in os.listdir(chdir):
@@ -105,7 +122,7 @@ def main(src, dst):
             el.clear()
     out, used, files = {}, {}, {}
     for cid in list(wide):
-        lst = dedupe(sorted(wide[cid], key=lambda x: x[0]))
+        lst = drop_umbrella(dedupe(sorted(wide[cid], key=lambda x: x[0])))
         if not lst:
             del wide[cid]; continue
         wide[cid] = lst
