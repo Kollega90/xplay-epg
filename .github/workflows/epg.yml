@@ -43,7 +43,7 @@ jobs:
           if raw[:2] == b'\x1f\x8b': raw = gzip.decompress(raw)
           t = raw.decode('utf-8', 'replace')
           def norm(s): return re.sub(r'[^a-zа-яёіїєґ0-9+]', '', s.lower())
-          want = ['1+1', 'стб', 'новийканал', 'тет']
+          want = ['1+1', '1plus1', 'стб', 'новийканал', 'тет']
           chans = {}
           for m in re.finditer(r'<channel id="([^"]*)"[^>]*>(.*?)</channel>', t, re.S):
               chans[m.group(1)] = [norm(x) for x in re.findall(r'<display-name[^>]*>([^<]*)', m.group(2))]
@@ -60,9 +60,9 @@ jobs:
                   cnt[m[3]] = cnt.get(m[3], 0) + 1
           print('channels in source:', len(chans), 'with future programmes:', len(cnt))
           for w in want:
-              hits = [i for i, n in chans.items() if w in n]
+              hits = [i for i, n in chans.items() if any(w in x for x in n)]
               print('==', w, 'matches:', len(hits))
-              for i in hits[:12]:
+              for i in hits[:25]:
                   print('  id=%s names=%s progs_next24h=%d' % (i, chans[i][:3], cnt.get(i, 0)))
           PY
       - name: Build epg.json and channel files
