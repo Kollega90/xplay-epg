@@ -87,9 +87,21 @@ jobs:
           names = {}
           for m in re.finditer(r'<channel id="([^"]*)"[^>]*>(.*?)</channel>', t, re.S):
               for x in re.findall(r'<display-name[^>]*>([^<]*)', m.group(2)): names.setdefault(norm(x), m.group(1))
+          import time as _t, calendar as _c
+          def _ts(x):
+              m = re.match(r'(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)?\s*([+-]\d{4})?', x)
+              v = _c.timegm((int(m[1]), int(m[2]), int(m[3]), int(m[4]), int(m[5]), int(m[6] or 0)))
+              if m[7]: v -= (1 if m[7][0] == '+' else -1) * (int(m[7][1:3]) * 3600 + int(m[7][3:5]) * 60)
+              return v
+          rng = {}
+          for m in re.finditer(r'<programme start="([^"]*)" stop="([^"]*)" channel="([^"]*)"', t):
+              r = rng.setdefault(m[3], [10**12, 0]); a_, b_ = _ts(m[1]), _ts(m[2])
+              r[0] = min(r[0], a_); r[1] = max(r[1], b_)
+          NOW = _t.time()
           st = collections.Counter(); bad = collections.defaultdict(list)
           for i, n, g in pl:
-              if i in d: st['ok(main)'] += 1; continue
+              if i in d and d[i]['p']: st['ok(main, есть передачи)'] += 1; continue
+              if i in d: st['в main, но передач нет'] += 1; bad['в main, но передач нет'].append((i, n, g)); continue
               if i in sid and i in pid: k = 'id в источнике с программой, но НЕТ в main'
               elif i in sid: k = 'id в источнике, программ нет'
               elif norm(n) in names: k = 'id нет, но совпало имя'
@@ -98,7 +110,8 @@ jobs:
           print('playlist', len(pl), dict(st))
           for k, v in bad.items():
               print('==', k, len(v), collections.Counter(x[2] for x in v).most_common(6))
-              for x in v[:12]: print('   ', x)
+              for x in v[:14]:
+                  r = rng.get(x[0]); print('   ', x, ('данные: от %+.0fч до %+.0fч' % ((r[0]-NOW)/3600, (r[1]-NOW)/3600)) if r else 'нет программ')
           PY
       - name: Sanity check
         run: |
