@@ -39,18 +39,6 @@ jobs:
           mkdir -p site
           python3 build_epg.py epg.src site/epg.json
           du -sh site site/ch
-      - name: DIAG3 (временно)
-        continue-on-error: true
-        run: |
-          python3 - <<'PY'
-          import json, time
-          d = json.load(open('site/epg.json', encoding='utf-8'))
-          now = time.time()
-          print('generated g=', d.get('g'), 'now=', int(now))
-          for i in ['1plus1-ukraina', 'stb-ua', 'novy-kanal-ua', 'tet-ua', 'mega-ua']:
-              e = d['c'].get(i)
-              print(i, 'in main' if e else 'MISSING', (len(e['p']), [(int((p[0]-now)/60), int((p[1]-now)/60), p[2][:20]) for p in e['p'][:4]]) if e else '')
-          PY
       - name: Sanity check
         run: |
           python3 - <<'PY'
