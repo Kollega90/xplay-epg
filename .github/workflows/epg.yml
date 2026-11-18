@@ -70,6 +70,36 @@ jobs:
           mkdir -p site
           python3 build_epg.py epg.src site/epg.json
           du -sh site site/ch
+      - name: DIAG2 (временно) плейлист vs epg.json
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          import json, re, collections
+          pl = json.load(open('diag_pl.json', encoding='utf-8'))
+          d = json.load(open('site/epg.json', encoding='utf-8'))['c']
+          src = open('epg.src', 'rb').read()
+          if src[:2] == b'\x1f\x8b':
+              import gzip; src = gzip.decompress(src)
+          t = src.decode('utf-8', 'replace')
+          sid = set(re.findall(r'<channel id="([^"]*)"', t))
+          pid = set(re.findall(r'<programme [^>]*channel="([^"]*)"', t))
+          def norm(s): return re.sub(r'[^a-zа-яёіїєґ0-9+]', '', s.lower())
+          names = {}
+          for m in re.finditer(r'<channel id="([^"]*)"[^>]*>(.*?)</channel>', t, re.S):
+              for x in re.findall(r'<display-name[^>]*>([^<]*)', m.group(2)): names.setdefault(norm(x), m.group(1))
+          st = collections.Counter(); bad = collections.defaultdict(list)
+          for i, n, g in pl:
+              if i in d: st['ok(main)'] += 1; continue
+              if i in sid and i in pid: k = 'id в источнике с программой, но НЕТ в main'
+              elif i in sid: k = 'id в источнике, программ нет'
+              elif norm(n) in names: k = 'id нет, но совпало имя'
+              else: k = 'нет в источнике'
+              st[k] += 1; bad[k].append((i, n, g))
+          print('playlist', len(pl), dict(st))
+          for k, v in bad.items():
+              print('==', k, len(v), collections.Counter(x[2] for x in v).most_common(6))
+              for x in v[:12]: print('   ', x)
+          PY
       - name: Sanity check
         run: |
           python3 - <<'PY'
