@@ -34,85 +34,11 @@ jobs:
           done
           [ "$ok" = 1 ] || { echo "no EPG source reachable"; exit 1; }
           ls -la epg.src
-      - name: DIAG (временно) каналы без программы
-        continue-on-error: true
-        run: |
-          python3 - <<'PY'
-          import gzip, re, time, calendar
-          raw = open('epg.src', 'rb').read()
-          if raw[:2] == b'\x1f\x8b': raw = gzip.decompress(raw)
-          t = raw.decode('utf-8', 'replace')
-          def norm(s): return re.sub(r'[^a-zа-яёіїєґ0-9+]', '', s.lower())
-          want = ['1+1', '1plus1', 'стб', 'новийканал', 'тет']
-          chans = {}
-          for m in re.finditer(r'<channel id="([^"]*)"[^>]*>(.*?)</channel>', t, re.S):
-              chans[m.group(1)] = [norm(x) for x in re.findall(r'<display-name[^>]*>([^<]*)', m.group(2))]
-          now = time.time()
-          def ts(s):
-              m = re.match(r'(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)?\s*([+-]\d{4})?', s)
-              v = calendar.timegm((int(m[1]), int(m[2]), int(m[3]), int(m[4]), int(m[5]), int(m[6] or 0)))
-              if m[7]: v -= (1 if m[7][0] == '+' else -1) * (int(m[7][1:3]) * 3600 + int(m[7][3:5]) * 60)
-              return v
-          cnt = {}; last = {}
-          for m in re.finditer(r'<programme start="([^"]*)" stop="([^"]*)" channel="([^"]*)"', t):
-              b = ts(m[2])
-              if b > now and ts(m[1]) < now + 86400:
-                  cnt[m[3]] = cnt.get(m[3], 0) + 1
-          print('channels in source:', len(chans), 'with future programmes:', len(cnt))
-          for w in want:
-              hits = [i for i, n in chans.items() if any(w in x for x in n)]
-              print('==', w, 'matches:', len(hits))
-              for i in hits[:25]:
-                  print('  id=%s names=%s progs_next24h=%d' % (i, chans[i][:3], cnt.get(i, 0)))
-          PY
       - name: Build epg.json and channel files
         run: |
           mkdir -p site
           python3 build_epg.py epg.src site/epg.json
           du -sh site site/ch
-      - name: DIAG2 (временно) плейлист vs epg.json
-        continue-on-error: true
-        run: |
-          python3 - <<'PY'
-          import json, re, collections
-          pl = json.load(open('diag_pl.json', encoding='utf-8'))
-          d = json.load(open('site/epg.json', encoding='utf-8'))['c']
-          src = open('epg.src', 'rb').read()
-          if src[:2] == b'\x1f\x8b':
-              import gzip; src = gzip.decompress(src)
-          t = src.decode('utf-8', 'replace')
-          sid = set(re.findall(r'<channel id="([^"]*)"', t))
-          pid = set(re.findall(r'<programme [^>]*channel="([^"]*)"', t))
-          def norm(s): return re.sub(r'[^a-zа-яёіїєґ0-9+]', '', s.lower())
-          names = {}
-          for m in re.finditer(r'<channel id="([^"]*)"[^>]*>(.*?)</channel>', t, re.S):
-              for x in re.findall(r'<display-name[^>]*>([^<]*)', m.group(2)): names.setdefault(norm(x), m.group(1))
-          import time as _t, calendar as _c
-          def _ts(x):
-              m = re.match(r'(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)?\s*([+-]\d{4})?', x)
-              v = _c.timegm((int(m[1]), int(m[2]), int(m[3]), int(m[4]), int(m[5]), int(m[6] or 0)))
-              if m[7]: v -= (1 if m[7][0] == '+' else -1) * (int(m[7][1:3]) * 3600 + int(m[7][3:5]) * 60)
-              return v
-          rng = {}
-          for m in re.finditer(r'<programme start="([^"]*)" stop="([^"]*)" channel="([^"]*)"', t):
-              r = rng.setdefault(m[3], [10**12, 0]); a_, b_ = _ts(m[1]), _ts(m[2])
-              r[0] = min(r[0], a_); r[1] = max(r[1], b_)
-          NOW = _t.time()
-          st = collections.Counter(); bad = collections.defaultdict(list)
-          for i, n, g in pl:
-              if i in d and d[i]['p']: st['ok(main, есть передачи)'] += 1; continue
-              if i in d: st['в main, но передач нет'] += 1; bad['в main, но передач нет'].append((i, n, g)); continue
-              if i in sid and i in pid: k = 'id в источнике с программой, но НЕТ в main'
-              elif i in sid: k = 'id в источнике, программ нет'
-              elif norm(n) in names: k = 'id нет, но совпало имя'
-              else: k = 'нет в источнике'
-              st[k] += 1; bad[k].append((i, n, g))
-          print('playlist', len(pl), dict(st))
-          for k, v in bad.items():
-              print('==', k, len(v), collections.Counter(x[2] for x in v).most_common(6))
-              for x in v[:14]:
-                  r = rng.get(x[0]); print('   ', x, ('данные: от %+.0fч до %+.0fч' % ((r[0]-NOW)/3600, (r[1]-NOW)/3600)) if r else 'нет программ')
-          PY
       - name: Sanity check
         run: |
           python3 - <<'PY'
