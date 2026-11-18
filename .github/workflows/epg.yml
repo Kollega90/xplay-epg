@@ -39,6 +39,31 @@ jobs:
           mkdir -p site
           python3 build_epg.py epg.src site/epg.json
           du -sh site site/ch
+      - name: DIAG4 (временно) описания
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          import json, time, os
+          d = json.load(open('site/epg.json', encoding='utf-8'))['c']
+          now = time.time()
+          tot = hasd = 0
+          for e in d.values():
+              for p in e['p']:
+                  tot += 1; hasd += 1 if len(p) > 3 and p[3] else 0
+          print('main: programmes', tot, 'with desc', hasd)
+          for i in ['1plus1-ukraina', 'stb-ua', 'novy-kanal-ua', 'tet-ua', 'mega-ua']:
+              e = d[i]
+              cur = [p for p in e['p'] if p[0] <= now < p[1]]
+              c = json.load(open('site/ch/%s.json' % e['f'], encoding='utf-8'))['p']
+              cf = [p for p in c if p[0] <= now < p[1]]
+              withd = sum(1 for p in c if len(p) > 3)
+              print(i, 'main cur desc len:', [len(p[3]) if len(p) > 3 else 0 for p in cur], '| file cur:', [len(p[3]) if len(p) > 3 else 0 for p in cf], '| file progs', len(c), 'with desc', withd)
+          nodesc = 0; tot2 = 0
+          for f in os.listdir('site/ch')[:400]:
+              for p in json.load(open('site/ch/' + f, encoding='utf-8'))['p']:
+                  tot2 += 1; nodesc += 0 if len(p) > 3 else 1
+          print('sample 400 files: progs', tot2, 'without desc', nodesc)
+          PY
       - name: Sanity check
         run: |
           python3 - <<'PY'
