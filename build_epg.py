@@ -4,6 +4,7 @@
 Выход (рядом с выходным файлом):
   epg.json         - как раньше: ближайшие ~24 часа, названия каналов, описания у 2 ближайших передач;
                      у каждого канала добавлено поле f - имя файла с полной программой (стабильный хеш id)
+  d/<f>.json       - лёгкая программа канала (-3..+24 ч, описания до 900 символов) для мгновенных описаний в списке
   ch/<f>.json      - полная программа канала: от 7 суток назад до 2 суток вперёд (для экрана «Программа и архив»)
 
 Использование: python3 build_epg.py вход.xml[.gz] выход.json"""
@@ -14,6 +15,9 @@ HOURS_BACK = 3          # главный epg.json: назад (на случай
 DESC_FOR = 1            # главный epg.json: описания только у стольких передач на канал (остальное приложение дозагружает из ch/<f>.json)
 DESC_MAX = 1500
 
+QD_BACK_H = 3           # d/<f>.json (лёгкие файлы для мгновенных описаний в списке): назад
+QD_AHEAD_H = 24         # ... и вперёд
+QD_DESC_MAX = 900       # описание в лёгком файле (полное - в ch/<f>.json)
 CH_BACK_H = 7 * 24 + 2  # файлы каналов: назад (архив у провайдера 7 суток)
 CH_AHEAD_H = 48         # файлы каналов: вперёд
 CH_DESC_MAX = 1500
@@ -138,6 +142,23 @@ def main(src, dst):
         out[cid] = {'n': names.get(cid, []), 'f': files[cid], 'p': [p if p[3] else p[:3] for p in main_l]}
     with open(dst, 'w', encoding='utf-8') as o:
         json.dump({'v': 1, 'g': now, 'c': out}, o, ensure_ascii=False, separators=(',', ':'))
+    # d/<f>.json: передачи от -3 ч до +24 ч с описаниями (5-15 КБ) - приложение заранее грузит их для видимой страницы списка (как OTT)
+    qdir = os.path.join(os.path.dirname(os.path.abspath(dst)), 'd')
+    os.makedirs(qdir, exist_ok=True)
+    for old in os.listdir(qdir):
+        if old.endswith('.json'): os.remove(os.path.join(qdir, old))
+    qlo, qhi, qtot = now - QD_BACK_H * 3600, now + QD_AHEAD_H * 3600, 0
+    for cid, lst in wide.items():
+        rows = []
+        for p in lst:
+            if p[1] > qlo and p[0] < qhi:
+                d = p[3][:QD_DESC_MAX]
+                rows.append([p[0], p[1], p[2], d] if d else [p[0], p[1], p[2]])
+        path = os.path.join(qdir, files[cid] + '.json')
+        with open(path, 'w', encoding='utf-8') as o:
+            json.dump({'v': 1, 'g': now, 'p': rows}, o, ensure_ascii=False, separators=(',', ':'))
+        qtot += os.path.getsize(path)
+    print('d/: %d files, %.1f MB' % (len(wide), qtot / 1048576.0))
     chdir = os.path.join(os.path.dirname(os.path.abspath(dst)), 'ch')
     total = 0
     for desc_max, desc_from in LEVELS:
