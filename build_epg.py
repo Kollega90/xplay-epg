@@ -5,7 +5,7 @@
   epg.json         - как раньше: ближайшие ~24 часа, названия каналов, описания у 2 ближайших передач;
                      у каждого канала добавлено поле f - имя файла с полной программой (стабильный хеш id)
   d/<f>.json       - лёгкая программа канала (-3..+24 ч, описания до 1500 символов) для мгновенных описаний в списке
-  ch/<f>.json      - полная программа канала: от 7 суток назад до 2 суток вперёд (для экрана «Программа и архив»)
+  ch/<f>.json      - полная программа канала: от 7 суток назад до 7 суток вперёд (описания — до +48 ч) (для экрана «Программа и архив»)
 
 Использование: python3 build_epg.py вход.xml[.gz] выход.json"""
 import sys, os, gzip, json, time, calendar, re, hashlib, xml.etree.ElementTree as ET
@@ -19,7 +19,8 @@ QD_BACK_H = 3           # d/<f>.json (лёгкие файлы для мгнов�
 QD_AHEAD_H = 24         # ... и вперёд
 QD_DESC_MAX = 1500      # описание в лёгком файле (как в ch/<f>.json)
 CH_BACK_H = 7 * 24 + 2  # файлы каналов: назад (архив у провайдера 7 суток)
-CH_AHEAD_H = 48         # файлы каналов: вперёд
+CH_AHEAD_H = 7 * 24 + 2  # файлы каналов: вперёд (как у OTTPlay — неделя; сколько реально, зависит от источника)
+CH_DESC_AHEAD_H = 48    # описания в файлах каналов только у передач, начинающихся не позже чем через 48 ч (дальше — только названия)
 CH_DESC_MAX = 1500
 MAX_TOTAL = int(os.environ.get('EPG_MAX_TOTAL_MB', '300')) * 1024 * 1024   # предел суммарного размера файлов каналов
 # если файлы получаются слишком большими: (длина описания, описания только у передач, закончившихся не раньше N секунд назад; None = у всех)
@@ -91,7 +92,7 @@ def write_channels(chdir, wide, files, now, desc_max, desc_from):
     for cid, lst in wide.items():
         rows = []
         for p in lst:
-            d = p[3][:desc_max] if desc_max and (desc_from is None or p[1] >= now - desc_from) else ''
+            d = p[3][:desc_max] if desc_max and (desc_from is None or p[1] >= now - desc_from) and p[0] < now + CH_DESC_AHEAD_H * 3600 else ''
             rows.append([p[0], p[1], p[2], d] if d else [p[0], p[1], p[2]])
         path = os.path.join(chdir, files[cid] + '.json')
         with open(path, 'w', encoding='utf-8') as o:
