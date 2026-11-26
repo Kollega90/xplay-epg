@@ -12,7 +12,7 @@ import sys, os, gzip, json, time, calendar, re, hashlib, xml.etree.ElementTree a
 
 HOURS_AHEAD = 24        # главный epg.json: вперёд
 HOURS_BACK = 3          # главный epg.json: назад (на случай ушедших часов пояса/задержки)
-DESC_FOR = 1            # главный epg.json: описания только у стольких передач на канал (остальное приложение дозагружает из ch/<f>.json)
+DESC_FOR = 0            # главный epg.json без описаний (как OTT: описания приложение догружает из d/<f>.json для видимых строк). Было 1 — главный файл ~6.7 МБ > лимита localStorage ТВ
 DESC_MAX = 1500
 
 QD_BACK_H = 3           # d/<f>.json (лёгкие файлы для мгновенных описаний в списке): назад
